@@ -1,0 +1,25 @@
+func main() {
+
+    // Read in configuration & flags
+
+    // Start client -> server proxy
+    clientChannel := make (chan UdpMessage, 10)
+    serverChannel := make (chan UdpMessage, 10)
+
+    // After we receive our first message, we can start our 
+    firstMessageReceived := false
+
+    go proxyFunc(listenPort, clientChannel)
+    select {
+    case msg := <- clientChannel
+        fmt.Printf("Received Client Message!\n")
+    case msg := <- serverChannel
+        fmt.Printf("Received Client Message!\n")
+    }
+
+
+
+    // server -> client proxy
+    
+    // Start client -> server proxy
+}
