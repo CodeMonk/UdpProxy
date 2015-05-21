@@ -21,21 +21,70 @@ func dieErr(err error) {
 		panic(err.Error())
 	}
 }
+func (u *UdpProxy) FakeServer(listenPort int) {
+	// Start a fake echo server that will return the received data backward
+	// as a response
+	conn, err := u.getUdpListener(listenPort)
+	dieErr(err)
+
+	buf := make([]byte, 10000)
+	for {
+		n, addr, err := conn.ReadFromUDP(buf)
+		dieErr(err)
+
+		// We have a connection!
+		go u.fakeRespond(conn, addr, buf[0:n])
+	}
+}
+
+func reverse(src []byte) []byte {
+	length := len(src)
+	dest := make([]byte, length)
+
+	for i := range src {
+		dest[length-i] = src[i]
+	}
+
+	return dest
+}
+
+func (u *UdpProxy) fakeRespond(conn *net.UDPConn, addr *net.UDPAddr, msg []byte) {
+	// Reverse our string
+	reversed := reverse(msg)
+	_, err := conn.WriteToUDP(reversed, addr)
+	if err != nil {
+		fmt.Printf("Error writing: %s\n", err.Error())
+	}
+}
+
+func (u *UdpProxy) getUdpListener(port int) (*net.UDPConn, error) {
+
+	// Setup Listening connection
+	caddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(port))
+	if err != nil {
+		return nil, err
+	}
+	conn, err := net.ListenUDP("udp", caddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, err
+
+}
 
 func (u *UdpProxy) Run(listenPort int, destServer string) {
 
 	// Wait for connections.  For each connection, spawn
 	// a routine to send request over to server, and sender
 	// server's response to client.
+
 	var err error
 	u.serverAddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d",
 		destServer, listenPort))
 	dieErr(err)
 
-	// Setup Listening connection
-	caddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(listenPort))
-	dieErr(err)
-	conn, err := net.ListenUDP("udp", caddr)
+	conn, err := u.getUdpListener(listenPort)
 	dieErr(err)
 
 	for {

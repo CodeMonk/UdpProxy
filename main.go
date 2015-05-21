@@ -9,6 +9,7 @@ import (
 var (
 	listenPort = flag.Int("port", 8042, "Port to listen on")
 	server     = flag.String("server", "192.168.2.3", "Destination to proxy to")
+	fake       = flag.Bool("fakeServer", false, "Start fake udp server, instead of proxy")
 )
 
 func init() {
@@ -22,6 +23,10 @@ func main() {
 	// Start client -> server proxy
 	proxy := &udp.UdpProxy{}
 
-	proxy.Run(*listenPort, *server)
+	if *fake {
+		proxy.FakeServer(*listenPort)
+	} else {
+		proxy.Run(*listenPort, *server)
+	}
 
 }
