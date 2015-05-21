@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/CodeMonk/UdpProxy/udp"
 )
@@ -23,28 +22,6 @@ func main() {
 	// Start client -> server proxy
 	proxy := &udp.UdpProxy{}
 
-	fromClient, fromServer, toClient, toServer := proxy.Initialize(*server,
-		*listenPort)
+	proxy.Run(*listenPort, *server)
 
-	for {
-		select {
-		case msg := <-fromClient:
-			_ = msg
-			fmt.Printf("Received Client Message! from %s Payload:%s\n",
-				msg.Address, string(msg.Payload))
-
-			// And, send it on
-			proxy.Proxy(msg, toServer)
-		case msg := <-fromServer:
-			_ = msg
-			fmt.Printf("Received Server Message! from %s Payload:%s\n",
-				msg.Address, string(msg.Payload))
-
-			// And, send it on
-			proxy.Proxy(msg, toClient)
-		}
-	}
-
-	// server -> client proxy
-	// Start client -> server proxy
 }
