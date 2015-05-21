@@ -31,14 +31,14 @@ func main() {
 		case msg := <-fromClient:
 			_ = msg
 			fmt.Printf("Received Client Message! from %s Payload:%s\n",
-				msg.From, string(msg.Payload))
+				msg.Address, string(msg.Payload))
 
 			// And, send it on
 			proxy.Proxy(msg, toServer)
 		case msg := <-fromServer:
 			_ = msg
 			fmt.Printf("Received Server Message! from %s Payload:%s\n",
-				msg.From, string(msg.Payload))
+				msg.Address, string(msg.Payload))
 
 			// And, send it on
 			proxy.Proxy(msg, toClient)
