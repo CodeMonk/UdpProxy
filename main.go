@@ -25,8 +25,6 @@ func main() {
 
 	fromClient, fromServer, toClient, toServer := proxy.Initialize(*server,
 		*listenPort)
-	_ = toClient
-	_ = toServer
 
 	for {
 		select {
@@ -36,14 +34,14 @@ func main() {
 				msg.From, string(msg.Payload))
 
 			// And, send it on
-			//proxy.Proxy(msg, toServer)
+			proxy.Proxy(msg, toServer)
 		case msg := <-fromServer:
 			_ = msg
 			fmt.Printf("Received Server Message! from %s Payload:%s\n",
 				msg.From, string(msg.Payload))
 
 			// And, send it on
-			//proxy.Proxy(msg, toClient)
+			proxy.Proxy(msg, toClient)
 		}
 	}
 

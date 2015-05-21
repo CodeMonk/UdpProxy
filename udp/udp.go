@@ -41,43 +41,66 @@ func (u *UdpProxy) dumpConnectionInformation() {
 		u.listenServer, u.server)
 }
 
-func (u *UdpProxy) clientReceiver(con *net.UDPConn) {
+func (u *UdpProxy) clientReceiver() {
 
 	buf := make([]byte, 10000)
 
 	// Read our first packet to get connection information
-	n, addr, err := con.ReadFromUDP(buf)
+	n, addr, err := u.clientConn.ReadFromUDP(buf)
 	dieErr(err)
-	con.Close()
+
+	// Finish our initialization which will create our client
 	u.finishInitialization(addr)
 
-	// And send our response onward
+	// And send our response upward
 	u.fromClient <- &UdpMessage{addr, u.listenClient, buf[0:n]}
 
-	// Finally, start our real loop
-	for {
-		// Receive Payload
-
-		// Send it on channel
-	}
-
+	// There is a real receiver now, so we can exit.
 }
 func (u *UdpProxy) StartClientReceiver() {
 	// Wait for message, then send it on the channel
-	con, err := net.ListenUDP("udp", u.listenClient)
+	var err error
+
+	u.clientConn, err = net.ListenUDP("udp", u.listenClient)
 	dieErr(err)
 
-	go u.clientReceiver(con)
+	go u.clientReceiver()
 }
 
-//func StartSenders(server string, port int, clientMessage *UdpMessage,
-//	toClient, toServer chan []byte) {
-//
-//	serverAddr, err := net.ResolveUDPAddr("udp",
-//		fmt.Sprintf("%s:%d", server, port))
-//	dieErr(err)
-//
-//}
+func sender(conn *net.UDPConn, c chan []byte) {
+	for {
+		payload := <-c
+		fmt.Printf("About to send %d bytes to %s->%s", len(payload),
+			conn.LocalAddr(), conn.RemoteAddr())
+		n, err := conn.Write(payload)
+		dieErr(err)
+		if n != len(payload) {
+			fmt.Printf("Error:  Wrote %d instead of %d bytes!\n", n, len(payload))
+		}
+	}
+}
+
+func receiver(con *net.UDPConn, c chan *UdpMessage) {
+	buf := make([]byte, 10000)
+
+	for {
+		n, err := con.Read(buf)
+		dieErr(err)
+		c <- &UdpMessage{nil, nil, buf[0:n]}
+	}
+}
+
+func (u *UdpProxy) StartSendersAndReceivers() {
+
+	// Start senders
+	go sender(u.serverConn, u.toServer)
+	go sender(u.clientConn, u.toClient)
+
+	// Start receivers
+	go receiver(u.serverConn, u.fromServer)
+	go receiver(u.clientConn, u.fromClient)
+
+}
 
 func (u *UdpProxy) Initialize(server string, port int) (chan *UdpMessage,
 	chan *UdpMessage, chan []byte, chan []byte) {
@@ -108,10 +131,16 @@ func (u *UdpProxy) finishInitialization(fromClient *net.UDPAddr) {
 		fmt.Sprintf(":%d", fromClient.Port))
 	dieErr(err)
 
-	u.dumpConnectionInformation()
-	panic("foo")
+	// Create our real connections
+	u.listenServer.Port++
+	fmt.Printf("Dialing ServerCon Local: %s, remote: %s\n", u.listenServer, u.server)
+	u.serverConn, err = net.DialUDP("udp", u.listenServer, u.server)
+	dieErr(err)
 
-	// Start Senders!
-	//u.clientConn, err = net.DialUDP("udp", laddr, raddr)
-	//dieErr(err)
+	u.StartSendersAndReceivers()
+}
+
+func (u *UdpProxy) Proxy(msg *UdpMessage, c chan []byte) {
+	// Just pop the body into the channel
+	c <- msg.Payload
 }
