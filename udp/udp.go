@@ -42,7 +42,8 @@ func reverse(src []byte) []byte {
 	dest := make([]byte, length)
 
 	for i := range src {
-		dest[length-i] = src[i]
+		length--
+		dest[length] = src[i]
 	}
 
 	return dest
