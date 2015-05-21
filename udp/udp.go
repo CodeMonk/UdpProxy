@@ -104,11 +104,11 @@ func (u *UdpProxy) doProxy(clientConn *net.UDPConn, src *net.UDPAddr, buf []byte
 	// Send/Receive message from server
 
 	// LogHook (client -> server == buf)
-	fmt.Printf("client -> server: %s\n", buf)
+	//fmt.Printf("client -> server: %s\n", buf)
 	response, err := u.sendToServer(buf)
 	if err == nil {
 		// LogHook (server -> client == response)
-		fmt.Printf("server -> client: %s\n", response)
+		//fmt.Printf("server -> client: %s\n", response)
 		_, err = clientConn.WriteToUDP(response, src)
 		dieErr(err)
 	}
