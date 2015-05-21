@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-type UdpMessage struct {
-	Address *net.UDPAddr
-	Payload []byte
-}
-
 type UdpProxy struct {
 	serverAddr *net.UDPAddr
 }
@@ -21,44 +16,8 @@ func dieErr(err error) {
 		panic(err.Error())
 	}
 }
-func (u *UdpProxy) FakeServer(listenPort int) {
-	// Start a fake echo server that will return the received data backward
-	// as a response
-	conn, err := u.getUdpListener(listenPort)
-	dieErr(err)
 
-	buf := make([]byte, 10000)
-	for {
-		n, addr, err := conn.ReadFromUDP(buf)
-		dieErr(err)
-
-		// We have a connection!
-		go u.fakeRespond(conn, addr, buf[0:n])
-	}
-}
-
-func reverse(src []byte) []byte {
-	length := len(src)
-	dest := make([]byte, length)
-
-	for i := range src {
-		length--
-		dest[length] = src[i]
-	}
-
-	return dest
-}
-
-func (u *UdpProxy) fakeRespond(conn *net.UDPConn, addr *net.UDPAddr, msg []byte) {
-	// Reverse our string
-	reversed := reverse(msg)
-	_, err := conn.WriteToUDP(reversed, addr)
-	if err != nil {
-		fmt.Printf("Error writing: %s\n", err.Error())
-	}
-}
-
-func (u *UdpProxy) getUdpListener(port int) (*net.UDPConn, error) {
+func getUdpListener(port int) (*net.UDPConn, error) {
 
 	// Setup Listening connection
 	caddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(port))
@@ -85,7 +44,7 @@ func (u *UdpProxy) Run(listenPort int, destServer string) {
 		destServer, listenPort))
 	dieErr(err)
 
-	conn, err := u.getUdpListener(listenPort)
+	conn, err := getUdpListener(listenPort)
 	dieErr(err)
 
 	for {
@@ -105,7 +64,7 @@ func (u *UdpProxy) doProxy(clientConn *net.UDPConn, src *net.UDPAddr, buf []byte
 
 	// LogHook (client -> server == buf)
 	//fmt.Printf("client -> server: %s\n", buf)
-	response, err := u.sendToServer(buf)
+	response, err := sendRecv(u.serverAddr, buf, 60)
 	if err == nil {
 		// LogHook (server -> client == response)
 		//fmt.Printf("server -> client: %s\n", response)
@@ -121,14 +80,15 @@ func (u *UdpProxy) respondToClient(conn *net.UDPConn,
 	dieErr(err)
 }
 
-func (u *UdpProxy) sendToServer(msg []byte) ([]byte, error) {
+func sendRecv(saddr *net.UDPAddr, msg []byte, timeout int) ([]byte, error) {
 	// send msg to server, and wait for a response
 
-	conn, err := net.DialUDP("udp", nil, u.serverAddr)
+	conn, err := net.DialUDP("udp", nil, saddr)
 	dieErr(err)
 
 	// This should work for the read and the write
-	err = conn.SetDeadline(time.Now().Add(time.Second * 60))
+	err = conn.SetDeadline(time.Now().Add(time.Second *
+		time.Duration(timeout)))
 	dieErr(err)
 
 	_, err = conn.Write(msg)
