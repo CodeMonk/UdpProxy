@@ -7,9 +7,15 @@ import (
 	"time"
 )
 
+type ProxyHandler interface {
+	MessageLogger(bool, *net.UDPAddr, []byte)
+}
+
 type UdpProxy struct {
 	serverAddr *net.UDPAddr
+	handlers []ProxyHandler
 }
+
 
 func dieErr(err error) {
 	if err != nil {
@@ -32,6 +38,36 @@ func getUdpListener(port int) (*net.UDPConn, error) {
 	return conn, err
 
 }
+
+func (u *UdpProxy) AddHandler(handler ProxyHandler) {
+	u.handlers = append(u.handlers, handler)
+}
+
+func (u *UdpProxy) RemoveHandler(handler ProxyHandler) error {
+	if len(u.handlers) < 1 {
+		return fmt.Errorf("No handlers installed.")
+	}
+	// grow new array, and copy all but removed into it.
+	newHandlers := make([]ProxyHandler, len(u.handlers))
+	count := 0
+
+	for _, item := range u.handlers {
+		if item != handler {
+			newHandlers[count] = item
+			count ++
+		}
+	}
+
+	if count == len(u.handlers) {
+		// didn't remove anything
+		return fmt.Errorf("Could not find handler %v", handler)
+	}
+
+	u.handlers = newHandlers[0:count]
+
+	return nil
+}
+
 
 func (u *UdpProxy) Run(listenPort int, destServer string) {
 
@@ -58,16 +94,22 @@ func (u *UdpProxy) Run(listenPort int, destServer string) {
 
 }
 
+func (u *UdpProxy) callHandlers(server bool, addr *net.UDPAddr, data []byte) {
+	for _, handler := range(u.handlers) {
+		go handler.MessageLogger(server, addr, data)
+	}
+}
+
 func (u *UdpProxy) doProxy(clientConn *net.UDPConn, src *net.UDPAddr, buf []byte) {
 
 	// Send/Receive message from server
 
-	// LogHook (client -> server == buf)
+	u.callHandlers(false, src, buf)
+
 	//fmt.Printf("client -> server: %s\n", buf)
 	response, err := sendRecv(u.serverAddr, buf, 60)
 	if err == nil {
-		// LogHook (server -> client == response)
-		//fmt.Printf("server -> client: %s\n", response)
+		u.callHandlers(true, u.serverAddr, response)
 		_, err = clientConn.WriteToUDP(response, src)
 		dieErr(err)
 	}
